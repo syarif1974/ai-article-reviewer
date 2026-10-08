@@ -2,6 +2,7 @@ import streamlit as st
 from pypdf import PdfReader
 from docx import Document
 import requests, re, json, io, html
+from pathlib import Path
 from datetime import datetime
 from collections import Counter
 
@@ -34,6 +35,11 @@ CSS = """
 .review-table .c-ref{width:58%}
 .title-full{padding:14px 16px;border:1px solid #334155;border-radius:10px;background:#111827;font-size:18px;font-weight:700;line-height:1.55;white-space:normal;overflow-wrap:anywhere}
 .scope-card{padding:14px 16px;border:1px solid #334155;border-radius:10px;background:#111827;margin:7px 0;line-height:1.5}
+.sidebar-profile{padding:18px 14px 16px;border:1px solid rgba(148,163,184,.20);border-radius:18px;background:linear-gradient(180deg,rgba(30,41,59,.92),rgba(17,24,39,.92));box-shadow:0 10px 28px rgba(0,0,0,.20);margin-bottom:16px;text-align:center}
+.sidebar-profile img{width:118px;height:118px;object-fit:cover;border-radius:50%;border:4px solid rgba(255,255,255,.95);box-shadow:0 7px 20px rgba(0,0,0,.30);display:block;margin:0 auto 12px}
+.sidebar-profile .name{font-size:18px;font-weight:800;line-height:1.25;color:#f8fafc;margin:0}
+.sidebar-profile .role{font-size:12px;line-height:1.45;color:#cbd5e1;margin:5px 0 0}
+.sidebar-profile .line{height:1px;background:linear-gradient(90deg,transparent,rgba(148,163,184,.35),transparent);margin:14px 0 12px}
 </style>
 """
 st.markdown(CSS, unsafe_allow_html=True)
@@ -1247,6 +1253,11 @@ def render_scope_cards(scopes):
 
 
 with st.sidebar:
+    _profile_path=Path(__file__).with_name("profile.jpg")
+    if _profile_path.exists():
+        import base64
+        _profile_b64=base64.b64encode(_profile_path.read_bytes()).decode("ascii")
+        st.markdown(f"<div class='sidebar-profile'><img src='data:image/jpeg;base64,{_profile_b64}' alt='Foto profil'><div class='name'>AI Article Reviewer</div><div class='role'>Review artikel ilmiah secara sistematis, objektif, dan terarah</div><div class='line'></div></div>", unsafe_allow_html=True)
     st.header("⚙️ Pengaturan")
     mode=st.radio("Mode AI",["Demo / Offline","AI API"])
     api_key=""; endpoint="https://api.openai.com/v1"; model="gpt-4o-mini"
