@@ -1,7 +1,7 @@
 import streamlit as st
 from pypdf import PdfReader
 from docx import Document
-import requests, re, json, io, html
+import requests, re, json, io, html, base64
 from pathlib import Path
 from datetime import datetime
 from collections import Counter
@@ -10,9 +10,15 @@ st.set_page_config(page_title="AI Article Reviewer", page_icon="📝", layout="w
 
 CSS = """
 <style>
-.main {max-width: 1250px; margin:auto;}
-.hero {padding:22px 24px;border-radius:16px;background:linear-gradient(135deg,#172554,#1e3a8a);color:white;margin-bottom:18px;}
-.hero h1{margin:0 0 6px 0}.card{padding:18px;border:1px solid #dbe3ef;border-radius:14px;background:#fff;margin-bottom:12px}
+.main {max-width: 1450px; margin:auto;}
+.hero {padding:18px 24px;border-radius:16px;background:linear-gradient(135deg,#172554,#1e3a8a);color:white;margin-bottom:18px;}
+.hero-row{display:flex;align-items:center;gap:22px;min-height:118px}
+.hero-photo{width:112px;height:112px;object-fit:cover;object-position:center top;border-radius:22px;border:3px solid rgba(255,255,255,.92);box-shadow:0 8px 24px rgba(0,0,0,.24);display:block;flex:0 0 auto}
+.hero-copy{min-width:0}
+.hero-copy h1{margin:0 0 6px 0;font-size:clamp(28px,3.2vw,44px);line-height:1.1}
+.hero-copy .hero-subtitle{font-size:16px;line-height:1.5;opacity:.96}
+.card{padding:18px;border:1px solid #dbe3ef;border-radius:14px;background:#fff;margin-bottom:12px}
+@media(max-width:680px){.hero{padding:16px 18px}.hero-row{gap:14px;min-height:96px}.hero-photo{width:88px;height:88px;border-radius:18px}.hero-copy h1{font-size:28px}.hero-copy .hero-subtitle{font-size:14px}}
 .small{color:#64748b;font-size:13px}.issue-critical{border-left:5px solid #b91c1c;padding:10px;background:#fef2f2;margin:7px 0}
 .issue-major{border-left:5px solid #d97706;padding:10px;background:#fffbeb;margin:7px 0}.issue-minor{border-left:5px solid #2563eb;padding:10px;background:#eff6ff;margin:7px 0}
 .issue-editorial{border-left:5px solid #64748b;padding:10px;background:#f8fafc;margin:7px 0;color:#0f172a}
@@ -35,11 +41,6 @@ CSS = """
 .review-table .c-ref{width:58%}
 .title-full{padding:14px 16px;border:1px solid #334155;border-radius:10px;background:#111827;font-size:18px;font-weight:700;line-height:1.55;white-space:normal;overflow-wrap:anywhere}
 .scope-card{padding:14px 16px;border:1px solid #334155;border-radius:10px;background:#111827;margin:7px 0;line-height:1.5}
-.sidebar-profile{padding:18px 14px 16px;border:1px solid rgba(148,163,184,.20);border-radius:18px;background:linear-gradient(180deg,rgba(30,41,59,.92),rgba(17,24,39,.92));box-shadow:0 10px 28px rgba(0,0,0,.20);margin-bottom:16px;text-align:center}
-.sidebar-profile img{width:118px;height:118px;object-fit:cover;border-radius:50%;border:4px solid rgba(255,255,255,.95);box-shadow:0 7px 20px rgba(0,0,0,.30);display:block;margin:0 auto 12px}
-.sidebar-profile .name{font-size:18px;font-weight:800;line-height:1.25;color:#f8fafc;margin:0}
-.sidebar-profile .role{font-size:12px;line-height:1.45;color:#cbd5e1;margin:5px 0 0}
-.sidebar-profile .line{height:1px;background:linear-gradient(90deg,transparent,rgba(148,163,184,.35),transparent);margin:14px 0 12px}
 </style>
 """
 st.markdown(CSS, unsafe_allow_html=True)
@@ -1223,7 +1224,13 @@ def export_markdown(r):
     out+="\n## Revision Roadmap\n"+"\n".join(f"{i+1}. {x}" for i,x in enumerate(r.get("roadmap",[])))
     return out
 
-st.markdown('<div class="hero"><h1>📝 AI Article Reviewer</h1><div>Review artikel ilmiah secara sistematis, objektif, dan terarah.</div></div>',unsafe_allow_html=True)
+_hero_photo_path=Path(__file__).with_name("profile.jpg")
+if _hero_photo_path.exists():
+    _hero_photo_b64=base64.b64encode(_hero_photo_path.read_bytes()).decode("ascii")
+    _hero_photo_html=f"<img class='hero-photo' src='data:image/jpeg;base64,{_hero_photo_b64}' alt='Foto Syarif Hidayat'>"
+else:
+    _hero_photo_html="<div class='hero-photo' style='display:flex;align-items:center;justify-content:center;font-size:34px;background:#1e293b;'>📝</div>"
+st.markdown(f"""<div class="hero"><div class="hero-row">{_hero_photo_html}<div class="hero-copy"><h1>AI Article Reviewer</h1><div class="hero-subtitle">Review artikel ilmiah secara sistematis, objektif, dan terarah.</div></div></div></div>""",unsafe_allow_html=True)
 
 
 def generate_scope_alternatives(title, field):
@@ -1252,21 +1259,15 @@ def render_scope_cards(scopes):
         st.markdown(f'<div class="scope-card"><b>{i}. {html.escape(sc["label"])}</b><br>{html.escape(sc["text"])}</div>',unsafe_allow_html=True)
 
 
-with st.sidebar:
-    _profile_path=Path(__file__).with_name("profile.jpg")
-    if _profile_path.exists():
-        import base64
-        _profile_b64=base64.b64encode(_profile_path.read_bytes()).decode("ascii")
-        st.markdown(f"<div class='sidebar-profile'><img src='data:image/jpeg;base64,{_profile_b64}' alt='Foto profil'><div class='name'>AI Article Reviewer</div><div class='role'>Review artikel ilmiah secara sistematis, objektif, dan terarah</div><div class='line'></div></div>", unsafe_allow_html=True)
-    st.header("⚙️ Pengaturan")
-    mode=st.radio("Mode AI",["Demo / Offline","AI API"])
+with st.expander("⚙️ Pengaturan", expanded=False):
+    mode=st.radio("Mode AI",["Demo / Offline","AI API"],horizontal=True)
     api_key=""; endpoint="https://api.openai.com/v1"; model="gpt-4o-mini"
     if mode=="AI API":
         api_key=st.text_input("API Key",type="password")
         endpoint=st.text_input("Endpoint OpenAI-compatible",endpoint)
         model=st.text_input("Model",model)
         st.caption("AI API menghasilkan review substantif. Kunci API tidak disimpan ke file.")
-    st.divider(); st.caption("Versi 2.9 — Evidence-grounded review, rekomendasi spesifik, alternatif solusi berbasis temuan, scope otomatis, judul utuh, dan tabel tanpa geser.")
+    st.caption("Versi 2.9 — Evidence-grounded review, rekomendasi spesifik, alternatif solusi berbasis temuan, scope otomatis, judul utuh, dan tabel tanpa geser.")
 
 menu=st.radio("Menu",["📄 Artikel Baru","🔍 Review Bertahap","📝 Simpulan Catatan Reviewer","🗂️ Riwayat"],horizontal=True)
 
